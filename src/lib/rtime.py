@@ -1,5 +1,7 @@
 import time, ntptime
 from machine import RTC
+import gc
+
 class RTime:
     UTC_OFFSET = 6 * 60 * 60
     
@@ -13,6 +15,7 @@ class RTime:
     AM_PM = 6
     
     def __init__(self):
+        gc.collect()
         ntptime.settime()
 
         real_time = time.localtime(time.time() + RTime.UTC_OFFSET)
