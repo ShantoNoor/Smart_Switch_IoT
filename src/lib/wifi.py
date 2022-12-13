@@ -1,4 +1,5 @@
 import network, time
+from CONFIG import *
 
 class Wifi:
     def __init__(self):
