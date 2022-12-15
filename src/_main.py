@@ -13,21 +13,30 @@ from wifi import *
 from rtime import *
 import gc
 
+gc.enable()
+
 TIME_OUT = 5000
+
 BUTTON_LEFT = 0
 BUTTON_RIGHT = 1
 
+SINGLE_PRESS = 2
+DOUBLE_PRESS = 3
+LONG_PRESS = 4
+
 tft = tft_config.config(0)
 tft.init()
+tft.on()
+
 t1 = Timer(0)
 
 wifi = Wifi()
-wifi.connect()
+wifi.connect(tft)
+gc.collect()
 
 # real_time = RTime()
 # real_time.show_time()
-
-print('here')
+# gc.collect()
 
 def center(text, bg = st7789.RED):
     length = len(text)
@@ -39,97 +48,86 @@ def center(text, bg = st7789.RED):
         st7789.WHITE,
         bg)
 
-print('here1')
 
 def _print(text, bg = st7789.RED):
     tft.fill(bg)
     center(text, bg)
 
-print('here2')
 
 def __sleep__():
     print('Going to sleep ... ')
+    tft.fill(0)
     tft.off()
     lightsleep()
 
-print('here3')
-
-def __wake__():
-    tft.on()
-    t1.deinit()
-    t1.init(mode=Timer.ONE_SHOT, period=TIME_OUT, callback=lambda x: __sleep__())
-
-print('here4')
 
 def _wake(btn):
-    __wake__()
-    if(btn == BUTTON_LEFT):
+    if (btn == BUTTON_LEFT):
         _print('S: L')
         print('S: L')
-        
-    elif(btn == BUTTON_RIGHT):
+
+    elif (btn == BUTTON_RIGHT):
         _print('S: R')
         print('S: R')
 
-print('here5')
 
 def __wake(btn):
-    gc.collect()
-
-    tft.on()
-    t1.deinit()
-
+    _print('Status', st7789.BLUE)
     res = miio.get_status()
+    gc.collect()
 
     if res == True:
         _print('ON', st7789.GREEN)
     elif res == False:
         _print('OFF')
     else:
-        _print('Err', st7789.YELLOW)
+        _print('Err', st7789.MAGENTA)
 
-    t1.init(mode=Timer.ONE_SHOT, period=TIME_OUT, callback=lambda x: __sleep__())
-
-print('here6')
 
 def ___wake(btn):
-    __wake__()
-    if(btn == BUTTON_LEFT):
+    if (btn == BUTTON_LEFT):
         _print('L: L')
         print('L: L')
-        
-    elif(btn == BUTTON_RIGHT):
+
+    elif (btn == BUTTON_RIGHT):
         _print('L: R')
         print('L: R')
 
-print('here7')
+
+def __wake__(btn, press_type):
+    tft.on()
+    t1.deinit()
+
+    if press_type == SINGLE_PRESS:
+        _wake(btn)
+    elif press_type == DOUBLE_PRESS:
+        __wake(btn)
+        gc.collect()
+    elif press_type == LONG_PRESS:
+        ___wake(btn)
+
+    t1.init(mode=Timer.ONE_SHOT, period=TIME_OUT, callback=lambda x: __sleep__())
+
 
 buttons = Buttons()
 esp32.wake_on_ext0(buttons.left)
 esp32.wake_on_ext1((buttons.right,))
-print('here8')
 
 left_button = Pushbutton(buttons.left, True)
 right_button = Pushbutton(buttons.right, True)
-print('here9')
 
-left_button.release_func(_wake, (BUTTON_LEFT, ))
-right_button.release_func(_wake, (BUTTON_RIGHT,))
-print('here10')
+left_button.release_func(__wake__, (BUTTON_LEFT, SINGLE_PRESS))
+right_button.release_func(__wake__, (BUTTON_RIGHT,SINGLE_PRESS))
 
-left_button.double_func(__wake, (BUTTON_LEFT,))
-right_button.double_func(__wake, (BUTTON_RIGHT,))
-print('here11')
+left_button.double_func(__wake__, (BUTTON_LEFT, DOUBLE_PRESS))
+right_button.double_func(__wake__, (BUTTON_RIGHT, DOUBLE_PRESS))
 
-left_button.long_func(___wake, (BUTTON_LEFT,))
-right_button.long_func(___wake, (BUTTON_RIGHT,))
-print('here12')
+left_button.long_func(__wake__, (BUTTON_LEFT, LONG_PRESS))
+right_button.long_func(__wake__, (BUTTON_RIGHT, LONG_PRESS))
 
+_wake(BUTTON_LEFT)
 t1.init(mode=Timer.ONE_SHOT, period=TIME_OUT, callback=lambda x: __sleep__())
-_print('RUNNING')
-print('here13')
 
 loop = asyncio.get_event_loop()
 loop.run_forever()
-print('here14')
 
