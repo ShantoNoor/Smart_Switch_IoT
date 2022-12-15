@@ -1,9 +1,10 @@
 import time, ntptime
 from machine import RTC
 
+
 class RTime:
     UTC_OFFSET = 6 * 60 * 60
-    
+
     YEAR = 2
     MONTH = 1
     DATE = 0
@@ -12,7 +13,7 @@ class RTime:
     SECOND = 5
     DAY = 7
     AM_PM = 6
-    
+
     def __init__(self):
         self.rtc = RTC()
         ntptime.settime()
@@ -26,10 +27,10 @@ class RTime:
         second = real_time[5]
 
         self.rtc.init((year, month, date, 0, hour, minute, second, 0))
-    
+
     def get_time(self):
         real_time = self.rtc.datetime()
-        
+
         year = real_time[0]
         month = real_time[1]
         date = real_time[2]
@@ -38,11 +39,13 @@ class RTime:
         minute = real_time[5]
         second = real_time[6]
         am_pm = 'am'
-        
+
         if hour > 12:
             hour -= 12
             am_pm = 'pm'
-        
+        elif hour == 0:
+            hour = 12
+
         if day == 0:
             day = 'Mon'
         elif day == 1:
@@ -57,10 +60,11 @@ class RTime:
             day = 'Sat'
         elif day == 6:
             day = 'Sun'
-        
+
         return (date, month, year, hour, minute, second, am_pm, day)
-    
+
     def show_time(self):
         t = self.get_time()
-        print(f'{t[RTime.HOUR]}:{t[RTime.MINUTE]}:{t[RTime.SECOND]}-{t[RTime.AM_PM]} | {t[RTime.DAY]}-{t[RTime.DATE]}-{t[RTime.MONTH]}-{t[RTime.YEAR]}')
-    
+        print(
+            f'{t[RTime.HOUR]}:{t[RTime.MINUTE]}:{t[RTime.SECOND]}-{t[RTime.AM_PM]} | {t[RTime.DAY]}-{t[RTime.DATE]}-{t[RTime.MONTH]}-{t[RTime.YEAR]}')
+
