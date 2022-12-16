@@ -17,10 +17,11 @@ import gc
 
 import wifi_icon
 import battery_icon
+from weather import *
 
 gc.enable()
 
-TIME_OUT = 5000
+TIME_OUT = 10000
 
 BUTTON_LEFT = 0
 BUTTON_RIGHT = 1
@@ -32,6 +33,27 @@ LONG_PRESS = 4
 tft = tft_config.config(0)
 tft.init()
 tft.on()
+
+
+def left(text, height, bg=st7789.BLACK, font=font16, tc=st7789.WHITE):
+    tft.text(
+        font,
+        text,
+        0,
+        height,
+        tc,
+        bg)
+
+
+def right(text, height, bg=st7789.BLACK, font=font16, tc=st7789.WHITE):
+    length = len(text)
+    tft.text(
+        font,
+        text,
+        tft.width() - length * font.WIDTH,
+        height,
+        tc,
+        bg)
 
 
 def middle(text, height, bg=st7789.BLACK, font=fontb32, tc=st7789.WHITE):
@@ -79,9 +101,9 @@ def _print(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
 
 def __print(tt1, tt2, tt3, bg, tc=st7789.WHITE):
     tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
-    middle(tt1, 60, bg, fontb32, tc)
+    middle(tt1, 70, bg, fontb32, tc)
     middle(tt2, tft.height() // 2 - fontb32.HEIGHT // 2, bg, fontb32, tc)
-    middle(tt3, tft.height() - 100, 0x2104, fontb32, st7789.WHITE)
+    middle(f' {tt3} ', tft.height() - 100, 0x2104, fontb32, st7789.WHITE)
 
 
 def __sleep__():
@@ -145,15 +167,28 @@ def wake_():
         minuie = f'0{minuie}'
 
     middle(f'{hour}:{minuie}{am_pm}', 40, bg=st7789.RED)
-    middle(f'{rt[RTime.DATE]}/{rt[RTime.MONTH]}', 90, bg=st7789.BLUE)
-    middle(f'{rt[RTime.YEAR]}', 126, bg=st7789.BLUE)
-    middle(f'{rt[RTime.DAY]}', 170, bg=0x2104)
+    middle(f' {rt[RTime.DATE]}/{rt[RTime.MONTH]} ', 90, bg=st7789.BLUE)
+    middle(f' {rt[RTime.YEAR]} ', 122, bg=st7789.BLUE)
+    middle(f' {rt[RTime.DAY]} ', 166, bg=0x2104)
 
 
 def _wake():
-    show_info(st7789.GREEN)
-    center('S: L')
-    print('S: L')
+    show_info(0x2104)
+    __print('Getting', 'Weather', 'Data', st7789.BLUE)
+
+    temp, main_desc, hd, vs, wind, desc, fl = get_weather()
+    if temp is None:
+        __print('Unable', 'to get', 'Data', st7789.MAGENTA)
+        return
+
+    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, 0x2104)
+    left(f'TEMP:{int(temp)}C', 36, st7789.GREEN, fontb32, st7789.BLACK)
+    left(f'{main_desc.upper()}', 72, st7789.GREEN, fontb32, st7789.BLACK)
+    left(f'HD:{int(hd)}%', 110, st7789.RED, fontb16)
+    left(f'{vs // 1000}km | {int(wind)}m/s', 130, st7789.RED, font16)
+    right(f'{desc}', 150, st7789.RED, font16)
+    right(f'KHULNA, BD', 170, st7789.RED, font16)
+    right(f'Feels Like:{int(fl)}C', 190, st7789.RED, font16)
 
 
 def __wake():
@@ -167,7 +202,7 @@ def __wake():
     elif res == False:
         __print('Water', 'is', 'Off', st7789.RED, st7789.WHITE)
     else:
-        __print('Water', 'Err', 'Err', st7789.MAGENTA, st7789.WHITE)
+        __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
 
 
 def ___wake():
