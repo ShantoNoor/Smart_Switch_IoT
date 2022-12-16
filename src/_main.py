@@ -5,8 +5,9 @@ from machine import *
 from pushbutton import *
 from tft_buttons import *
 import uasyncio as asyncio
-import vga1_bold_16x16 as font
-import vga1_bold_16x32 as fontb
+import vga2_8x16 as font16
+import vga1_bold_16x16 as fontb16
+import vga1_bold_16x32 as fontb32
 
 import miio
 from CONFIG import *
@@ -32,9 +33,35 @@ tft = tft_config.config(0)
 tft.init()
 tft.on()
 
+
+def middle(text, height, bg=st7789.BLACK, font=fontb32, tc=st7789.WHITE):
+    length = len(text)
+    tft.text(
+        font,
+        text,
+        (tft.width() // 2) - (length * font.WIDTH) // 2,
+        height,
+        tc,
+        bg)
+
+
+def center(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
+    length = len(text)
+    tft.text(
+        font,
+        text,
+        (tft.width() // 2) - (length * font.WIDTH) // 2,
+        tft.height() // 2 - font.HEIGHT // 2,
+        fc,
+        bg)
+
+
 t1 = Timer(0)
 
 wifi = Wifi()
+tft.fill(0)
+middle('Conn..to', 20, font=fontb16)
+middle(SSID, 60)
 wifi.connect(tft)
 gc.collect()
 
@@ -45,53 +72,16 @@ real_time.show_time()
 gc.collect()
 
 
-def middle(text, height, bg=st7789.BLACK, font=fontb):
-    length = len(text)
-    tft.text(
-        font,
-        text,
-        (tft.width() // 2) - (length * font.WIDTH) // 2,
-        height,
-        st7789.WHITE,
-        bg)
+def _print(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
+    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
+    center(text, bg, font, fc)
 
 
-def left(text, height, bg=st7789.BLACK, font=fontb):
-    length = len(text)
-    tft.text(
-        font,
-        text,
-        0,
-        height,
-        st7789.WHITE,
-        bg)
-
-
-def right(text, height, bg=st7789.BLACK, font=fontb):
-    length = len(text)
-    tft.text(
-        font,
-        text,
-        tft.width() - length * font.WIDTH,
-        height,
-        st7789.WHITE,
-        bg)
-
-
-def center(text, bg=st7789.BLACK, font=fontb):
-    length = len(text)
-    tft.text(
-        font,
-        text,
-        (tft.width() // 2) - (length * font.WIDTH) // 2,
-        tft.height() // 2 - font.HEIGHT,
-        st7789.WHITE,
-        bg)
-
-
-def _print(text, bg=st7789.BLACK):
-    tft.fill(bg)
-    center(text, bg)
+def __print(tt1, tt2, tt3, bg, tc=st7789.WHITE):
+    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
+    middle(tt1, 60, bg, fontb32, tc)
+    middle(tt2, tft.height() // 2 - fontb32.HEIGHT // 2, bg, fontb32, tc)
+    middle(tt3, tft.height() - 100, 0x2104, fontb32, st7789.WHITE)
 
 
 def __sleep__():
@@ -101,21 +91,46 @@ def __sleep__():
     lightsleep()
 
 
-def show_info():
-    tft.bitmap(wifi_icon, 0, 0, 3)
-    tft.bitmap(battery_icon, 103, 0, 5)
-    tft.hline(0, 32, 135, st7789.WHITE)
+def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
+    tft.fill(st7789.BLACK)
 
-    tft.hline(0, 240-32, 135, st7789.WHITE)
-    tft.vline(135//2, 240-32, 32, st7789.WHITE)
-    left('ON', 240-32, font=font)
-    right('OFF', 240 - 32, font=font)
+    WIFI_ICON_INDEX = 0
+    WIFI_STATUS = wifi.status()
+
+    if WIFI_STATUS is None:
+        WIFI_ICON_INDEX = 4
+    elif WIFI_STATUS == 'good':
+        WIFI_ICON_INDEX = 3
+    elif WIFI_STATUS == 'okey':
+        WIFI_ICON_INDEX = 2
+    elif WIFI_STATUS == 'poor':
+        WIFI_ICON_INDEX = 1
+
+    tft.bitmap(wifi_icon, 0, 0, WIFI_ICON_INDEX)
+    tft.bitmap(battery_icon, 103, 0, 5)
+
+    tft.fill_rect(0, tft.height() - 32, tft.width() // 2, 32, st7789.GREEN)
+    tft.fill_rect(tft.width() // 2, tft.height() - 32, tft.width() // 2, 32, st7789.RED)
+
+    tft.hline(0, 32, 135, st7789.WHITE)
+    tft.hline(0, 240 - 32, 135, st7789.WHITE)
+    tft.vline(135 // 2, 240 - 32, 32, st7789.WHITE)
+
+    tft.text(fo, lt,
+             (tft.width() // 4) - (len(lt) * fo.WIDTH) // 2,
+             tft.height() - 3 * fo.HEIGHT // 2,
+             st7789.BLACK, st7789.GREEN)
+
+    tft.text(fo, rt,
+             (tft.width() // 4) * 3 - (len(rt) * fo.WIDTH) // 2,
+             tft.height() - 3 * fo.HEIGHT // 2,
+             st7789.WHITE, st7789.RED)
+
+    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
 
 
 def wake_():
-    tft.fill(st7789.BLACK)
-
-    show_info()
+    show_info(st7789.RED)
 
     rt = real_time.get_time()
 
@@ -129,33 +144,40 @@ def wake_():
     if minuie < 10:
         minuie = f'0{minuie}'
 
-    middle(f'{hour}:{minuie}{am_pm}', 40)
+    middle(f'{hour}:{minuie}{am_pm}', 40, bg=st7789.RED)
+    middle(f'{rt[RTime.DATE]}/{rt[RTime.MONTH]}', 90, bg=st7789.BLUE)
+    middle(f'{rt[RTime.YEAR]}', 126, bg=st7789.BLUE)
+    middle(f'{rt[RTime.DAY]}', 170, bg=0x2104)
 
 
 def _wake():
-    _print('S: L')
+    show_info(st7789.GREEN)
+    center('S: L')
     print('S: L')
 
 
 def __wake():
-    _print('Status', st7789.BLUE)
+    show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
+    __print('Getting', 'Water', 'Status', st7789.BLUE)
     res = miio.get_status()
     gc.collect()
 
     if res == True:
-        _print('ON', st7789.GREEN)
+        __print('Water', 'is', 'On', st7789.GREEN, st7789.BLACK)
     elif res == False:
-        _print('OFF')
+        __print('Water', 'is', 'Off', st7789.RED, st7789.WHITE)
     else:
-        _print('Err', st7789.MAGENTA)
+        __print('Water', 'Err', 'Err', st7789.MAGENTA, st7789.WHITE)
 
 
 def ___wake():
+    show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
     _print('L: L')
     print('L: L')
 
 
 def wake___():
+    show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
     _print('L: R')
     print('L: R')
 
@@ -202,5 +224,3 @@ t1.init(mode=Timer.ONE_SHOT, period=TIME_OUT, callback=lambda x: __sleep__())
 
 loop = asyncio.get_event_loop()
 loop.run_forever()
-
-

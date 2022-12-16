@@ -22,12 +22,13 @@ class Wifi:
             self.wifi.active(True)
             self.wifi.connect(SSID, PASSWORD)
 
+            LOGO_HEIGHT = 120
             while not self.isconnected():
                 for i in range(4):
-                    tft.bitmap(wifi_logo, 17, 70, i)
+                    tft.bitmap(wifi_logo, 17, LOGO_HEIGHT, i)
                     time.sleep(0.25)
 
-                tft.fill(0)
+                tft.fill_rect(17, LOGO_HEIGHT, 100, 100, 0)
                 gc.collect()
 
                 if (time.time() > end_time):
@@ -35,6 +36,7 @@ class Wifi:
                     self.wifi.active(False)
                     return False
 
+        tft.bitmap(wifi_logo, 17, LOGO_HEIGHT, 3)
         print('network config:', self.wifi.ifconfig())
         return True
 
@@ -44,15 +46,15 @@ class Wifi:
 
     def status(self):
         if not self.isconnected():
-            return '0%'
+            return None
 
         rssi = self.get_rssi()
         if (rssi > -67):
-            return '90%'
+            return 'good'
         elif (rssi > -80):
-            return '50%'
+            return 'okey'
 
-        return '10%'
+        return 'poor'
 
     def get_ip(self):
         if not self.isconnected():
