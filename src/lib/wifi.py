@@ -16,13 +16,13 @@ class Wifi:
         return self.wifi.status('rssi')
 
     def connect(self, tft, try_time=10):
+        LOGO_HEIGHT = 120
         if not self.isconnected():
             end_time = time.time() + try_time
             print('connecting to network...')
             self.wifi.active(True)
             self.wifi.connect(SSID, PASSWORD)
 
-            LOGO_HEIGHT = 120
             while not self.isconnected():
                 for i in range(4):
                     tft.bitmap(wifi_logo, 17, LOGO_HEIGHT, i)
