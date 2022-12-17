@@ -32,7 +32,9 @@ LONG_PRESS = 4
 
 tft = tft_config.config(0)
 tft.init()
-tft.on()
+
+t1 = Timer(0)
+wifi = Wifi()
 
 
 def left(text, height, bg=st7789.BLACK, font=font16, tc=st7789.WHITE):
@@ -78,13 +80,13 @@ def center(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
         bg)
 
 
-t1 = Timer(0)
+def connect_wifi():
+    middle('Conn..to', 20, font=fontb16)
+    middle(SSID, 60)
+    wifi.connect(tft)
 
-wifi = Wifi()
-tft.fill(0)
-middle('Conn..to', 20, font=fontb16)
-middle(SSID, 60)
-wifi.connect(tft)
+
+connect_wifi()
 gc.collect()
 
 time.sleep(1)
@@ -220,6 +222,9 @@ def wake___():
 def __wake__(btn, press_type):
     tft.on()
     t1.deinit()
+
+    if not wifi.isconnected() and btn != BUTTON_RIGHT and press_type != SINGLE_PRESS:
+        connect_wifi()
 
     if press_type == SINGLE_PRESS:
         if (btn == BUTTON_LEFT):
