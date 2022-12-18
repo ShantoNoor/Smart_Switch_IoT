@@ -1,7 +1,11 @@
-import network, time
-from CONFIG import *
-import wifi_logo
 import gc
+
+import network
+import time
+
+import wifi_logo
+from CONFIG import *
+
 
 class Wifi:
     def __init__(self):
@@ -60,4 +64,3 @@ class Wifi:
         if not self.isconnected():
             return None
         return self.wifi.ifconfig()[0]
-

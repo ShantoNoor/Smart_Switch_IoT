@@ -1,6 +1,8 @@
-import urequests as requests
-from CONFIG import *
 import errno
+
+import urequests as requests
+
+from CONFIG import *
 
 
 def get_weather():

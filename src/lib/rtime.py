@@ -1,6 +1,8 @@
-import time, ntptime
-from machine import RTC, reset
 import errno
+import ntptime
+import time
+
+from machine import RTC, reset
 
 
 class RTime:
@@ -74,5 +76,3 @@ class RTime:
         t = self.get_time()
         print(
             f'{t[RTime.HOUR]}:{t[RTime.MINUTE]}:{t[RTime.SECOND]}-{t[RTime.AM_PM]} | {t[RTime.DAY]}-{t[RTime.DATE]}-{t[RTime.MONTH]}-{t[RTime.YEAR]}')
-
-

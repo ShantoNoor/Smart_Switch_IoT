@@ -8,8 +8,9 @@
 __updated__ = "2019-10-19"
 __version__ = "0.1"
 
-import uasyncio as asyncio
 import time
+
+import uasyncio as asyncio
 
 type_gen = type((lambda: (yield))())  # Generator type
 

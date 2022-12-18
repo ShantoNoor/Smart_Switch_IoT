@@ -20,4 +20,3 @@ def get_volt(loop=20):
     ADC_EN.off()
 
     return (val, (adc.read_uv() / 10 ** 6))
-

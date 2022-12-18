@@ -1,7 +1,7 @@
 # input pins for esp32 T-Display module
 
 from machine import Pin
-import time
+
 
 class Buttons():
     def __init__(self):

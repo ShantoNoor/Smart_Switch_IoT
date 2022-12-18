@@ -1,10 +1,11 @@
 """ LilyGo T-DISPLAY 135x240 ST7789 display """
 
-from machine import Pin, SPI
 import st7789
+from machine import Pin, SPI
 
 TFA = 40
 BFA = 40
+
 
 def config(rotation=0, buffer_size=0, options=0):
     return st7789.ST7789(
@@ -17,4 +18,4 @@ def config(rotation=0, buffer_size=0, options=0):
         backlight=Pin(4, Pin.OUT),
         rotation=rotation,
         options=options,
-        buffer_size= buffer_size)
+        buffer_size=buffer_size)
