@@ -1,8 +1,8 @@
 import errno
-import ntptime
 import time
 
-from machine import RTC, reset
+import ntptime
+from machine import RTC
 
 
 class RTime:
@@ -25,7 +25,7 @@ class RTime:
         except OSError as exc:
             print('Unable to Set Time from Online ... ')
             print(errno.errorcode[exc.errno])
-            reset()
+            # reset()
 
         real_time = time.localtime(time.time() + RTime.UTC_OFFSET)
         year = real_time[0]

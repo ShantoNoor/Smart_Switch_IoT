@@ -23,7 +23,10 @@ from wifi import *
 
 gc.enable()
 
-TIME_OUT = 10000
+TIME_OUT = 10
+START_TIME = 0
+
+DEEPSLEEP_TIME = 30 * 60  # sec
 
 WATER_ON_TIME = 11 * 60  # sec
 IS_WATER_ON = False
@@ -42,9 +45,7 @@ LONG_PRESS = 4
 tft = tft_config.config(0)
 tft.init()
 
-t1 = Timer(0)
 wifi = Wifi()
-
 
 def left(text, height, bg=st7789.BLACK, font=font16, tc=st7789.WHITE):
     tft.text(
@@ -78,6 +79,18 @@ def middle(text, height, bg=st7789.BLACK, font=fontb32, tc=st7789.WHITE):
         bg)
 
 
+def _print(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
+    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
+    center(text, bg, font, fc)
+
+
+def __print(tt1, tt2, tt3, bg, tc=st7789.WHITE):
+    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
+    middle(tt1, 70, bg, fontb32, tc)
+    middle(tt2, tft.height() // 2 - fontb32.HEIGHT // 2, bg, fontb32, tc)
+    middle(f' {tt3} ', tft.height() - 100, 0x2104, fontb32, st7789.WHITE)
+
+
 def center(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
     length = len(text)
     tft.text(
@@ -90,37 +103,24 @@ def center(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
 
 
 def connect_wifi():
-    middle('Connecting to', 24, font=font16)
-    middle(SSID, 60)
-
+    tft.fill(0x2104)
+    __print('Wifi', 'Con..to ', 'FreeNet', 0x2104)
     try:
-        wifi.connect(tft)
+        wifi.connect()
     except OSError as exc:
         print('Unable to connect to wifi ... ')
         print(errno.errorcode[exc.errno])
         reset()
 
 
-connect_wifi()
 gc.collect()
+connect_wifi()
 
 time.sleep(1)
 
 real_time = RTime()
 real_time.show_time()
 gc.collect()
-
-
-def _print(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
-    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
-    center(text, bg, font, fc)
-
-
-def __print(tt1, tt2, tt3, bg, tc=st7789.WHITE):
-    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
-    middle(tt1, 70, bg, fontb32, tc)
-    middle(tt2, tft.height() // 2 - fontb32.HEIGHT // 2, bg, fontb32, tc)
-    middle(f' {tt3} ', tft.height() - 100, 0x2104, fontb32, st7789.WHITE)
 
 
 def save_file(text):
@@ -146,28 +146,8 @@ def read_file():
     return x
 
 
-def __sleep__():
-    global IS_WATER_ON
-    global WATER_ON_TIME
-    global WATER_OFF_TIME
-
-    print('Going to sleep ... ')
-    tft.fill(0)
-    tft.off()
-
-    if not IS_WATER_ON:
-        lightsleep()
-    else:
-        st = int(WATER_OFF_TIME) - int(time.time())
-        lightsleep(int(st) * 1000)
-        if WATER_OFF_TIME - time.time() <= 0:
-            __alarm__()
-
-
 def __alarm__():
     tft.on()
-    t1.deinit()
-
     print('__Alarm__')
 
     show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
@@ -186,7 +166,6 @@ def __alarm__():
         time.sleep(0.2)
 
     wake___()
-    t1.init(mode=Timer.ONE_SHOT, period=TIME_OUT, callback=lambda x: __sleep__())
 
 
 def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
@@ -204,12 +183,33 @@ def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
     elif WIFI_STATUS == 'poor':
         WIFI_ICON_INDEX = 1
 
-    volt, volt2 = get_volt()
-    middle(str(volt), 0, bg=st7789.BLACK, font=font16, tc=st7789.WHITE)
-    middle(str(volt2), 16, bg=st7789.BLACK, font=font16, tc=st7789.WHITE)
+    BATTERY_ICON_INDEX = 0
+    BATTERY_CHARGING = False
+    volt = get_volt()
+    bl_str = ''
+    if volt >= 4.4:
+        BATTERY_ICON_INDEX = 5
+        BATTERY_CHARGING = True
+        bl_str = 'Chg'
+    else:
+        bl = get_charge_level(volt)
+        if bl > 80:
+            BATTERY_ICON_INDEX = 4
+        elif bl > 60:
+            BATTERY_ICON_INDEX = 3
+        elif bl > 40:
+            BATTERY_ICON_INDEX = 2
+        elif bl > 20:
+            BATTERY_ICON_INDEX = 1
+        else:
+            BATTERY_ICON_INDEX = 0
 
+        bl_str = str(f'{bl}%')
+
+    tft.text(fontb16, bl_str, tft.width() - len(bl_str) * fontb16.WIDTH - 34, 8, st7789.WHITE, st7789.BLACK)
+    # middle(f'{volt}', 0, st7789.BLACK, font16, st7789.GREEN)
     tft.bitmap(wifi_icon, 0, 0, WIFI_ICON_INDEX)
-    tft.bitmap(battery_icon, 103, 0, 5)
+    tft.bitmap(battery_icon, 103, 0, BATTERY_ICON_INDEX)
 
     tft.fill_rect(0, tft.height() - 32, tft.width() // 2, 32, st7789.GREEN)
     tft.fill_rect(tft.width() // 2, tft.height() - 32, tft.width() // 2, 32, st7789.RED)
@@ -326,7 +326,6 @@ def ___wake():
     global MAX_TRY
     global MAX_SLEEP
     try_number = 0
-    res = True
 
     res = None
     while res is None and try_number < MAX_TRY:
@@ -374,12 +373,12 @@ def wake___():
     save_file('0')
 
 
-def __wake__(btn, press_type):
+async def __wake__(btn, press_type):
+    global START_TIME
+    START_TIME = 0
     tft.on()
-    t1.deinit()
 
     if not wifi.isconnected() and btn != BUTTON_RIGHT and press_type != SINGLE_PRESS:
-        time.sleep(1)
         connect_wifi()
 
     if press_type == SINGLE_PRESS:
@@ -395,32 +394,63 @@ def __wake__(btn, press_type):
         elif (btn == BUTTON_RIGHT):
             wake___()
 
+    START_TIME = time.time()
     gc.collect()
-    t1.init(mode=Timer.ONE_SHOT, period=TIME_OUT, callback=lambda x: __sleep__())
 
 
-buttons = Buttons()
-esp32.wake_on_ext0(buttons.left)
-esp32.wake_on_ext1((buttons.right,))
+async def main():
+    global WATER_OFF_TIME
+    global IS_WATER_ON
+    global WATER_ON_TIME
+    global TIME_OUT
+    global START_TIME
+    global DEEPSLEEP_TIME
 
-left_button = Pushbutton(buttons.left, True)
-right_button = Pushbutton(buttons.right, True)
+    buttons = Buttons()
+    esp32.wake_on_ext0(buttons.left)
+    esp32.wake_on_ext1((buttons.right,))
 
-left_button.release_func(__wake__, (BUTTON_LEFT, SINGLE_PRESS))
-right_button.release_func(__wake__, (BUTTON_RIGHT, SINGLE_PRESS))
+    left_button = Pushbutton(buttons.left, True)
+    right_button = Pushbutton(buttons.right, True)
 
-left_button.double_func(__wake__, (BUTTON_LEFT, DOUBLE_PRESS))
-right_button.double_func(__wake__, (BUTTON_RIGHT, DOUBLE_PRESS))
+    left_button.release_func(__wake__, (BUTTON_LEFT, SINGLE_PRESS))
+    right_button.release_func(__wake__, (BUTTON_RIGHT, SINGLE_PRESS))
 
-left_button.long_func(__wake__, (BUTTON_LEFT, LONG_PRESS))
-right_button.long_func(__wake__, (BUTTON_RIGHT, LONG_PRESS))
+    left_button.double_func(__wake__, (BUTTON_LEFT, DOUBLE_PRESS))
+    right_button.double_func(__wake__, (BUTTON_RIGHT, DOUBLE_PRESS))
 
-WATER_OFF_TIME = int(read_file())
-if WATER_OFF_TIME != '0':
-    IS_WATER_ON = True
+    left_button.long_func(__wake__, (BUTTON_LEFT, LONG_PRESS))
+    right_button.long_func(__wake__, (BUTTON_RIGHT, LONG_PRESS))
 
-wake_()
-t1.init(mode=Timer.ONE_SHOT, period=TIME_OUT, callback=lambda x: __sleep__())
+    WATER_OFF_TIME = int(read_file())
+    if WATER_OFF_TIME != 0:
+        IS_WATER_ON = True
 
-loop = asyncio.get_event_loop()
-loop.run_forever()
+    wake_()
+
+    START_TIME = time.time()
+    while True:
+        if time.time() - START_TIME > TIME_OUT:
+            print('Going to sleep ... ')
+            tft.off()
+
+            if not IS_WATER_ON:
+                st = time.time()
+                lightsleep((DEEPSLEEP_TIME * 1000))
+                if time.time() - st >= DEEPSLEEP_TIME:
+                    print('Going to deep sleep ... ')
+                    deepsleep()
+            else:
+                st = int(WATER_OFF_TIME - time.time()) * 1000
+                lightsleep(st)
+                if WATER_OFF_TIME - time.time() <= 0:
+                    __alarm__()
+
+            START_TIME = time.time()
+
+        await asyncio.sleep_ms(1000)
+
+
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())

@@ -1,9 +1,5 @@
-import gc
-
-import network
 import time
-
-import wifi_logo
+import network
 from CONFIG import *
 
 
@@ -19,8 +15,7 @@ class Wifi:
             return None
         return self.wifi.status('rssi')
 
-    def connect(self, tft, try_time=10):
-        LOGO_HEIGHT = 120
+    def connect(self, try_time=10):
         if not self.isconnected():
             end_time = time.time() + try_time
             print('connecting to network...')
@@ -28,19 +23,11 @@ class Wifi:
             self.wifi.connect(SSID, PASSWORD)
 
             while not self.isconnected():
-                for i in range(4):
-                    tft.bitmap(wifi_logo, 17, LOGO_HEIGHT, i)
-                    time.sleep(0.25)
-
-                tft.fill_rect(17, LOGO_HEIGHT, 100, 100, 0)
-                gc.collect()
-
                 if (time.time() > end_time):
                     print('Unable to connect to network ... ')
                     self.wifi.active(False)
                     return False
 
-        tft.bitmap(wifi_logo, 17, LOGO_HEIGHT, 3)
         print('network config:', self.wifi.ifconfig())
         return True
 
