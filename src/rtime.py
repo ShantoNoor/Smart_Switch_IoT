@@ -1,6 +1,7 @@
 import errno
 import time
 
+import gc
 import ntptime
 from machine import RTC
 
@@ -19,23 +20,31 @@ class RTime:
 
     def __init__(self):
         self.rtc = RTC()
+        self.TIME_SYNCED = False
+        # self.init()
 
-        try:
-            ntptime.settime()
-        except OSError as exc:
-            print('Unable to Set Time from Online ... ')
-            print(errno.errorcode[exc.errno])
-            # reset()
+    def init(self):
+        if not self.TIME_SYNCED:
+            no_exception = True
+            try:
+                gc.collect()
+                ntptime.settime()
+            except Exception as exc:
+                print('Unable to Set Time from Online ... ')
+                print(errno.errorcode[exc.errno])
+                no_exception = False
 
-        real_time = time.localtime(time.time() + RTime.UTC_OFFSET)
-        year = real_time[0]
-        month = real_time[1]
-        date = real_time[2]
-        hour = real_time[3]
-        minute = real_time[4]
-        second = real_time[5]
+            real_time = time.localtime(time.time() + RTime.UTC_OFFSET)
+            year = real_time[0]
+            month = real_time[1]
+            date = real_time[2]
+            hour = real_time[3]
+            minute = real_time[4]
+            second = real_time[5]
 
-        self.rtc.init((year, month, date, 0, hour, minute, second, 0))
+            self.rtc.init((year, month, date, 0, hour, minute, second, 0))
+            if no_exception:
+                self.TIME_SYNCED = True
 
     def get_time(self):
         real_time = self.rtc.datetime()
@@ -70,7 +79,7 @@ class RTime:
         elif day == 6:
             day = 'Sun'
 
-        return (date, month, year, hour, minute, second, am_pm, day)
+        return date, month, year, hour, minute, second, am_pm, day
 
     def show_time(self):
         t = self.get_time()

@@ -1,7 +1,5 @@
 import errno
-
 import urequests as requests
-
 from CONFIG import *
 
 
@@ -19,7 +17,7 @@ def get_weather():
         main_desc = res.get('weather')[0].get('main')
         vs = res.get('visibility')
 
-    except OSError as exc:
+    except Exception as exc:
         print('Unable to get Weather Data ... ')
         print(errno.errorcode[exc.errno])
         return None, None, None, None, None, None, None

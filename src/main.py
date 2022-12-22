@@ -1,12 +1,10 @@
 import errno
 import gc
 import time
-
 import battery_icon
 import esp32
 import miio
 import st7789
-import tft_config
 import uasyncio as asyncio
 import vga1_bold_16x16 as fontb16
 import vga1_bold_16x32 as fontb32
@@ -16,12 +14,11 @@ from CONFIG import *
 from battery import *
 from machine import *
 from pushbutton import *
-from rtime import *
 from tft_buttons import *
 from weather import *
-from wifi import *
-
-gc.enable()
+from rtime import *
+from boot import *
+import watchdog
 
 TIME_OUT = 10
 START_TIME = 0
@@ -42,10 +39,6 @@ SINGLE_PRESS = 2
 DOUBLE_PRESS = 3
 LONG_PRESS = 4
 
-tft = tft_config.config(0)
-tft.init()
-
-wifi = Wifi()
 
 def left(text, height, bg=st7789.BLACK, font=font16, tc=st7789.WHITE):
     tft.text(
@@ -104,30 +97,15 @@ def center(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
 
 def connect_wifi():
     tft.fill(0x2104)
-    __print('Wifi', 'Con..to ', 'FreeNet', 0x2104)
-    try:
-        wifi.connect()
-    except OSError as exc:
-        print('Unable to connect to wifi ... ')
-        print(errno.errorcode[exc.errno])
-        reset()
-
-
-gc.collect()
-connect_wifi()
-
-time.sleep(1)
-
-real_time = RTime()
-real_time.show_time()
-gc.collect()
+    __print('Wifi', 'Conn..to', 'FreeNet', 0x2104)
+    _connect_wifi()
 
 
 def save_file(text):
     try:
         with open('t.txt', 'w') as f:
             f.write(text)
-    except OSError as exc:
+    except Exception as exc:
         __print('Unable', 'Save', 'File', st7789.MAGENTA)
         print('Unable Save File ... ')
         print(errno.errorcode[exc.errno])
@@ -138,7 +116,7 @@ def read_file():
     try:
         with open('t.txt', 'r') as f:
             x = f.read()
-    except OSError as exc:
+    except Exception as exc:
         __print('Unable', 'Read', 'File', st7789.MAGENTA)
         print('Unable Read File ... ')
         print(errno.errorcode[exc.errno])
@@ -147,6 +125,9 @@ def read_file():
 
 
 def __alarm__():
+    global START_TIME
+    START_TIME = float('inf')
+
     tft.on()
     print('__Alarm__')
 
@@ -166,11 +147,10 @@ def __alarm__():
         time.sleep(0.2)
 
     wake___()
+    START_TIME = time.time()
 
 
-def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
-    tft.fill(st7789.BLACK)
-
+def update_battery_and_wifi():
     WIFI_ICON_INDEX = 0
     WIFI_STATUS = wifi.status()
 
@@ -184,12 +164,10 @@ def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
         WIFI_ICON_INDEX = 1
 
     BATTERY_ICON_INDEX = 0
-    BATTERY_CHARGING = False
     volt = get_volt()
     bl_str = ''
     if volt >= 4.4:
         BATTERY_ICON_INDEX = 5
-        BATTERY_CHARGING = True
         bl_str = 'Chg'
     else:
         bl = get_charge_level(volt)
@@ -210,6 +188,12 @@ def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
     # middle(f'{volt}', 0, st7789.BLACK, font16, st7789.GREEN)
     tft.bitmap(wifi_icon, 0, 0, WIFI_ICON_INDEX)
     tft.bitmap(battery_icon, 103, 0, BATTERY_ICON_INDEX)
+
+
+def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
+    tft.fill(st7789.BLACK)
+
+    update_battery_and_wifi()
 
     tft.fill_rect(0, tft.height() - 32, tft.width() // 2, 32, st7789.GREEN)
     tft.fill_rect(tft.width() // 2, tft.height() - 32, tft.width() // 2, 32, st7789.RED)
@@ -232,7 +216,13 @@ def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
 
 
 def wake_():
+    global IS_WATER_ON
+
     show_info(st7789.RED)
+
+    if not IS_WATER_ON:
+        print('Setting time ..')
+        real_time.init()
 
     rt = real_time.get_time()
 
@@ -259,7 +249,7 @@ def _wake():
     gc.collect()
     try:
         temp, main_desc, hd, vs, wind, desc, fl = get_weather()
-    except OSError as exc:
+    except Exception as exc:
         __print('Unable', 'to get', 'Data', st7789.MAGENTA)
         print(errno.errorcode[exc.errno])
         return
@@ -281,12 +271,12 @@ def __wake():
     global IS_WATER_ON
     global WATER_OFF_TIME
     global WATER_ON_TIME
+    global MAX_TRY
+    global MAX_SLEEP
 
     show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
     __print('Getting', 'Water', 'Status', st7789.BLUE)
 
-    global MAX_TRY
-    global MAX_SLEEP
     try_number = 0
     res = None
 
@@ -297,9 +287,9 @@ def __wake():
 
     gc.collect()
 
-    if res == True:
+    if res:
         __print('Water', 'is', 'On', st7789.GREEN, st7789.BLACK)
-    elif res == False:
+    elif not res:
         __print('Water', 'is', 'Off', st7789.RED, st7789.WHITE)
     else:
         __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
@@ -318,22 +308,21 @@ def ___wake():
     global IS_WATER_ON
     global WATER_ON_TIME
     global WATER_OFF_TIME
+    global MAX_TRY
+    global MAX_SLEEP
 
     show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
     print('Turning on Water ... ')
     __print('Turning', 'on', 'Water', st7789.BLUE, st7789.WHITE)
 
-    global MAX_TRY
-    global MAX_SLEEP
     try_number = 0
-
     res = None
     while res is None and try_number < MAX_TRY:
         res = miio.set_power(True)
         try_number += 1
         time.sleep(MAX_SLEEP)
 
-    if res == True:
+    if res:
         __print('Water', 'is', 'On', st7789.GREEN, st7789.BLACK)
     else:
         __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
@@ -347,22 +336,21 @@ def ___wake():
 def wake___():
     global IS_WATER_ON
     global WATER_OFF_TIME
+    global MAX_SLEEP
+    global MAX_TRY
 
     show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
     print('Turning off Water ... ')
     __print('Turning', 'off', 'Water', st7789.BLUE, st7789.WHITE)
 
-    global MAX_TRY
-    global MAX_SLEEP
     try_number = 0
-
     res = None
     while res is None and try_number < MAX_TRY:
         res = miio.set_power()
         try_number += 1
         time.sleep(MAX_SLEEP)
 
-    if res == True:
+    if res:
         __print('Water', 'is', 'Off', st7789.RED, st7789.WHITE)
     else:
         __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
@@ -375,27 +363,33 @@ def wake___():
 
 async def __wake__(btn, press_type):
     global START_TIME
-    START_TIME = 0
+    global BUTTON_LEFT
+    global BUTTON_RIGHT
+    global SINGLE_PRESS
+    global DOUBLE_PRESS
+    global LONG_PRESS
+
+    START_TIME = float('inf')
     tft.on()
 
-    if not wifi.isconnected() and btn != BUTTON_RIGHT and press_type != SINGLE_PRESS:
+    if not wifi.is_connected() and btn != BUTTON_RIGHT and press_type != SINGLE_PRESS:
         connect_wifi()
 
     if press_type == SINGLE_PRESS:
-        if (btn == BUTTON_LEFT):
+        if btn == BUTTON_LEFT:
             _wake()
-        elif (btn == BUTTON_RIGHT):
+        elif btn == BUTTON_RIGHT:
             wake_()
     elif press_type == DOUBLE_PRESS:
         __wake()
     elif press_type == LONG_PRESS:
-        if (btn == BUTTON_LEFT):
+        if btn == BUTTON_LEFT:
             ___wake()
-        elif (btn == BUTTON_RIGHT):
+        elif btn == BUTTON_RIGHT:
             wake___()
 
-    START_TIME = time.time()
     gc.collect()
+    START_TIME = time.time()
 
 
 async def main():
@@ -405,6 +399,11 @@ async def main():
     global TIME_OUT
     global START_TIME
     global DEEPSLEEP_TIME
+    global BUTTON_LEFT
+    global BUTTON_RIGHT
+    global SINGLE_PRESS
+    global DOUBLE_PRESS
+    global LONG_PRESS
 
     buttons = Buttons()
     esp32.wake_on_ext0(buttons.left)
@@ -426,10 +425,16 @@ async def main():
     if WATER_OFF_TIME != 0:
         IS_WATER_ON = True
 
+    tft.init()
+    tft.fill(st7789.BLACK)
+    gc.collect()
     wake_()
 
+    wdt = watchdog.WDT(0, 20)  # 20 sec
     START_TIME = time.time()
     while True:
+        update_battery_and_wifi()
+
         if time.time() - START_TIME > TIME_OUT:
             print('Going to sleep ... ')
             tft.off()
@@ -449,6 +454,7 @@ async def main():
             START_TIME = time.time()
 
         await asyncio.sleep_ms(1000)
+        wdt.feed()
 
 
 if __name__ == '__main__':

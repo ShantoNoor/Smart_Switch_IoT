@@ -7,22 +7,22 @@ class Wifi:
     def __init__(self):
         self.wifi = network.WLAN(network.STA_IF)
 
-    def isconnected(self):
+    def is_connected(self):
         return self.wifi.isconnected()
 
     def get_rssi(self):
-        if not self.isconnected():
+        if not self.is_connected():
             return None
         return self.wifi.status('rssi')
 
     def connect(self, try_time=10):
-        if not self.isconnected():
+        if not self.is_connected():
             end_time = time.time() + try_time
             print('connecting to network...')
             self.wifi.active(True)
             self.wifi.connect(SSID, PASSWORD)
 
-            while not self.isconnected():
+            while not self.is_connected():
                 if (time.time() > end_time):
                     print('Unable to connect to network ... ')
                     self.wifi.active(False)
@@ -36,7 +36,7 @@ class Wifi:
         self.wifi.active(False)
 
     def status(self):
-        if not self.isconnected():
+        if not self.is_connected():
             return None
 
         rssi = self.get_rssi()
@@ -48,6 +48,6 @@ class Wifi:
         return 'poor'
 
     def get_ip(self):
-        if not self.isconnected():
+        if not self.is_connected():
             return None
         return self.wifi.ifconfig()[0]
