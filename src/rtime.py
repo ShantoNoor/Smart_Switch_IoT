@@ -1,13 +1,13 @@
-import errno
+import gc
 import time
 
-import gc
-import ntptime
 from machine import RTC
+
+import ntp_time
 
 
 class RTime:
-    UTC_OFFSET = 6 * 60 * 60
+    UTC_OFFSET = 6
 
     YEAR = 2
     MONTH = 1
@@ -21,29 +21,24 @@ class RTime:
     def __init__(self):
         self.rtc = RTC()
         self.TIME_SYNCED = False
-        # self.init()
 
-    def init(self):
+    async def init(self):
         if not self.TIME_SYNCED:
-            no_exception = True
-            try:
-                gc.collect()
-                ntptime.settime()
-            except Exception as exc:
+            gc.collect()
+
+            tm = await ntp_time.time(RTime.UTC_OFFSET)
+            if tm == 0:
                 print('Unable to Set Time from Online ... ')
-                print(errno.errorcode[exc.errno])
-                no_exception = False
+            else:
+                real_time = time.localtime(tm)
+                year = real_time[0]
+                month = real_time[1]
+                date = real_time[2]
+                hour = real_time[3]
+                minute = real_time[4]
+                second = real_time[5]
 
-            real_time = time.localtime(time.time() + RTime.UTC_OFFSET)
-            year = real_time[0]
-            month = real_time[1]
-            date = real_time[2]
-            hour = real_time[3]
-            minute = real_time[4]
-            second = real_time[5]
-
-            self.rtc.init((year, month, date, 0, hour, minute, second, 0))
-            if no_exception:
+                self.rtc.init((year, month, date, 0, hour, minute, second, 0))
                 self.TIME_SYNCED = True
 
     def get_time(self):
@@ -80,6 +75,9 @@ class RTime:
             day = 'Sun'
 
         return date, month, year, hour, minute, second, am_pm, day
+
+    def is_time_synced(self):
+        return self.TIME_SYNCED
 
     def show_time(self):
         t = self.get_time()

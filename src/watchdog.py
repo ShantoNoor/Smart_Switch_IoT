@@ -1,6 +1,8 @@
 import gc
-import machine
 from sys import platform
+
+import machine
+
 gc.collect()
 
 
@@ -15,12 +17,12 @@ class WDT:
             with open("watchdog.txt", "r") as f:
                 if f.read() == "True":
                     print("Reset reason: Watchdog")
-        except Exception as e:
+        except OSError as e:
             print(e)  # file probably just does not exist
         try:
             with open("watchdog.txt", "w") as f:
                 f.write("False")
-        except Exception as e:
+        except OSError as e:
             print("Error saving to file: {!s}".format(e))
             if use_rtc_memory and platform == "esp8266":
                 rtc = machine.RTC()
@@ -34,7 +36,7 @@ class WDT:
             try:
                 with open("watchdog.txt", "w") as f:
                     f.write("True")
-            except Exception as e:
+            except OSError as e:
                 print("Error saving to file: {!s}".format(e))
                 if self._use_rtc_memory and platform == "esp8266":
                     rtc = machine.RTC()

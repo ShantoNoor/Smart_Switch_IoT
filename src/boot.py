@@ -1,9 +1,9 @@
-import errno
+import gc
 
 from machine import Pin, reset
-import gc
-import tft_config
+
 import rtime
+import tft_config
 import wifi as WiFi
 
 gc.enable()
@@ -13,13 +13,13 @@ wifi = WiFi.Wifi()
 real_time = rtime.RTime()
 
 
-def _connect_wifi():
+def connect_wifi():
     try:
         wifi.connect()
-    except Exception as exc:
+    except OSError as exc:
         print('Unable to connect to wifi ... ')
-        print(errno.errorcode[exc.errno])
-        reset()
+        # print(errno.errorcode[exc.errno])
+        # reset()
 
 
 if __name__ == '__main__':
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     tft.png('boot.png', 0, 0)
 
     gc.collect()
-    _connect_wifi()
+    connect_wifi()
 
     gc.collect()
     real_time.init()

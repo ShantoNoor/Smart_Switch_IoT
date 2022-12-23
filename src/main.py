@@ -1,29 +1,25 @@
-import errno
-import gc
-import time
-import battery_icon
 import esp32
-import miio
 import st7789
-import uasyncio as asyncio
 import vga1_bold_16x16 as fontb16
 import vga1_bold_16x32 as fontb32
 import vga2_8x16 as font16
-import wifi_icon
-from CONFIG import *
-from battery import *
 from machine import *
+
+import battery_icon
+import miio
+import watchdog
+import wifi_icon
+from battery import *
+from boot import *
 from pushbutton import *
+from rtime import *
 from tft_buttons import *
 from weather import *
-from rtime import *
-from boot import *
-import watchdog
 
 TIME_OUT = 10
 START_TIME = 0
 
-DEEPSLEEP_TIME = 30 * 60  # sec
+DEEPSLEEP_TIME = 20 * 60  # sec
 
 WATER_ON_TIME = 11 * 60  # sec
 IS_WATER_ON = False
@@ -38,6 +34,9 @@ BUTTON_RIGHT = 1
 SINGLE_PRESS = 2
 DOUBLE_PRESS = 3
 LONG_PRESS = 4
+
+wdt = watchdog.WDT(0, 20)  # 20 sec
+wdt.deinit()
 
 
 def left(text, height, bg=st7789.BLACK, font=font16, tc=st7789.WHITE):
@@ -81,7 +80,7 @@ def __print(tt1, tt2, tt3, bg, tc=st7789.WHITE):
     tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
     middle(tt1, 70, bg, fontb32, tc)
     middle(tt2, tft.height() // 2 - fontb32.HEIGHT // 2, bg, fontb32, tc)
-    middle(f' {tt3} ', tft.height() - 100, 0x2104, fontb32, st7789.WHITE)
+    middle(tt3, tft.height() - 100, 0x2104, fontb32, st7789.WHITE)
 
 
 def center(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
@@ -95,20 +94,14 @@ def center(text, bg=st7789.BLACK, font=fontb32, fc=st7789.WHITE):
         bg)
 
 
-def connect_wifi():
-    tft.fill(0x2104)
-    __print('Wifi', 'Conn..to', 'FreeNet', 0x2104)
-    _connect_wifi()
-
-
 def save_file(text):
     try:
         with open('t.txt', 'w') as f:
             f.write(text)
-    except Exception as exc:
+    except OSError as exc:
         __print('Unable', 'Save', 'File', st7789.MAGENTA)
         print('Unable Save File ... ')
-        print(errno.errorcode[exc.errno])
+        # print(errno.errorcode[exc.errno])
 
 
 def read_file():
@@ -116,17 +109,33 @@ def read_file():
     try:
         with open('t.txt', 'r') as f:
             x = f.read()
-    except Exception as exc:
+    except OSError as exc:
         __print('Unable', 'Read', 'File', st7789.MAGENTA)
         print('Unable Read File ... ')
-        print(errno.errorcode[exc.errno])
+        # print(errno.errorcode[exc.errno])
 
     return x
+
+
+def __wifi__():
+    wdt.feed()
+    if not wifi.is_connected():
+        __print('Conn-ing', 'with', 'FreeNet', st7789.BLACK)
+        connect_wifi()
+        wdt.feed()
+        if not wifi.is_connected():
+            __print('Unable', 'Con-with', 'FreeNet', st7789.BLACK)
+            return False
+
+    wdt.feed()
+    return True
 
 
 def __alarm__():
     global START_TIME
     START_TIME = float('inf')
+
+    wdt.init()
 
     tft.on()
     print('__Alarm__')
@@ -134,6 +143,7 @@ def __alarm__():
     show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
 
     end_time = time.time() + 5
+    wdt.feed()
     while True and time.time() < end_time:
         __print('Time', 'is', 'Over', st7789.GREEN, st7789.BLACK)
         time.sleep(0.2)
@@ -146,8 +156,10 @@ def __alarm__():
         __print('Time', 'is', 'Over', st7789.MAGENTA, st7789.WHITE)
         time.sleep(0.2)
 
+    wdt.feed()
     wake___()
     START_TIME = time.time()
+    wdt.feed()
 
 
 def update_battery_and_wifi():
@@ -215,56 +227,69 @@ def show_info(bg=st7789.BLACK, lt='TEMP', rt='TIME', fo=font16):
     tft.fill_rect(0, 33, tft.width(), tft.height() - 65, bg)
 
 
-def wake_():
+async def wake_():
     global IS_WATER_ON
 
-    show_info(st7789.RED)
+    if not IS_WATER_ON and not real_time.is_time_synced():
+        if __wifi__():
+            wdt.feed()
 
-    if not IS_WATER_ON:
-        print('Setting time ..')
-        real_time.init()
+            show_info(st7789.BLUE)
+            __print('Syncing', 'Real', 'Time', st7789.BLUE)
 
-    rt = real_time.get_time()
+            wdt.feed()
+            await real_time.init()
 
-    hour = rt[RTime.HOUR]
-    minuie = rt[RTime.MINUTE]
-    am_pm = rt[RTime.AM_PM]
+    if real_time.is_time_synced():
+        show_info(st7789.RED)
 
-    if hour < 10:
-        hour = f'0{hour}'
+        rt = real_time.get_time()
+        hour = rt[RTime.HOUR]
+        minuie = rt[RTime.MINUTE]
+        am_pm = rt[RTime.AM_PM]
 
-    if minuie < 10:
-        minuie = f'0{minuie}'
+        if hour < 10:
+            hour = f'0{hour}'
 
-    middle(f'{hour}:{minuie}{am_pm}', 40, bg=st7789.RED)
-    middle(f' {rt[RTime.DATE]}/{rt[RTime.MONTH]} ', 90, bg=st7789.BLUE)
-    middle(f' {rt[RTime.YEAR]} ', 122, bg=st7789.BLUE)
-    middle(f' {rt[RTime.DAY]} ', 166, bg=0x2104)
+        if minuie < 10:
+            minuie = f'0{minuie}'
+
+        middle(f'{hour}:{minuie}{am_pm}', 40, bg=st7789.RED)
+        middle(f' {rt[RTime.DATE]}/{rt[RTime.MONTH]} ', 90, bg=st7789.BLUE)
+        middle(f' {rt[RTime.YEAR]} ', 122, bg=st7789.BLUE)
+        middle(f' {rt[RTime.DAY]} ', 166, bg=0x2104)
+    else:
+        show_info(st7789.MAGENTA)
+        __print('Time', 'Not', 'Synced', st7789.MAGENTA)
 
 
-def _wake():
-    show_info(st7789.BLUE)  # 0x2104
-    __print('Getting', 'Weather', 'Data', st7789.BLUE)
+async def _wake():
+    if __wifi__():
+        wdt.feed()
 
-    gc.collect()
-    try:
-        temp, main_desc, hd, vs, wind, desc, fl = get_weather()
-    except Exception as exc:
-        __print('Unable', 'to get', 'Data', st7789.MAGENTA)
-        print(errno.errorcode[exc.errno])
-        return
+        show_info(st7789.BLUE)  # 0x2104
+        __print('Getting', 'Weather', 'Data', st7789.BLUE)
 
-    if temp is None:
-        return
+        gc.collect()
+        try:
+            temp, main_desc, hd, vs, wind, desc, fl = await get_weather()
+        except OSError as exc:
+            __print('Unable', 'to get', 'Data', st7789.MAGENTA)
+            # print(errno.errorcode[exc.errno])
+            return
 
-    tft.fill_rect(0, 33, tft.width(), tft.height() - 65, st7789.GREEN)
-    left(f'TEMP:{int(temp)}C', 36, st7789.GREEN, fontb32, st7789.BLACK)
-    left(f'{main_desc.upper()}', 72, st7789.GREEN, fontb32, st7789.BLACK)
-    left(f'HD:{int(hd)}%', 110, st7789.RED, fontb16)
-    left(f'{vs // 1000}km | {int(wind)}m/s', 130, st7789.RED, font16)
-    right(f'{desc}', 150, st7789.RED, font16)
-    right(f'KHULNA, BD', 170, st7789.RED, font16)
-    right(f'Feels Like:{int(fl)}C', 190, st7789.RED, font16)
+        if temp is None:
+            __print('Unable', 'to get', 'Data', st7789.MAGENTA)
+            return
+
+        tft.fill_rect(0, 33, tft.width(), tft.height() - 65, st7789.GREEN)
+        left(f'TEMP:{int(temp)}C', 36, st7789.GREEN, fontb32, st7789.BLACK)
+        left(f'{main_desc.upper()}', 72, st7789.GREEN, fontb32, st7789.BLACK)
+        left(f'HD:{int(hd)}%', 110, st7789.RED, fontb16)
+        left(f'{vs // 1000}km | {int(wind)}m/s', 130, st7789.RED, font16)
+        right(f'{desc}', 150, st7789.RED, font16)
+        right(f'KHULNA, BD', 170, st7789.RED, font16)
+        right(f'Feels Like:{int(fl)}C', 190, st7789.RED, font16)
 
 
 def __wake():
@@ -274,34 +299,38 @@ def __wake():
     global MAX_TRY
     global MAX_SLEEP
 
-    show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
-    __print('Getting', 'Water', 'Status', st7789.BLUE)
+    if __wifi__():
+        wdt.feed()
 
-    try_number = 0
-    res = None
+        show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
+        __print('Getting', 'Water', 'Status', st7789.BLUE)
 
-    while res is None and try_number < MAX_TRY:
-        res = miio.get_status()
-        try_number += 1
-        time.sleep(MAX_SLEEP)
+        try_number = 0
+        res = None
 
-    gc.collect()
+        while res is None and try_number < MAX_TRY:
+            res = miio.get_status()
+            try_number += 1
+            wdt.feed()
+            time.sleep(MAX_SLEEP)
 
-    if res:
-        __print('Water', 'is', 'On', st7789.GREEN, st7789.BLACK)
-    elif not res:
-        __print('Water', 'is', 'Off', st7789.RED, st7789.WHITE)
-    else:
-        __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
+        gc.collect()
 
-    if IS_WATER_ON and res != False:
-        tft.rect(10, 180, 113, 10, st7789.WHITE)
-        tft.fill_rect(11, 181, 113 - int((((WATER_OFF_TIME - time.time()) / WATER_ON_TIME) * 102) + 11), 8,
-                      st7789.BLACK)
-    elif IS_WATER_ON and res == False:
-        IS_WATER_ON = False
-        WATER_OFF_TIME = 0
-        save_file('0')
+        if res == True:
+            __print('Water', 'is', 'On', st7789.GREEN, st7789.BLACK)
+        elif res == False:
+            __print('Water', 'is', 'Off', st7789.RED, st7789.WHITE)
+        else:
+            __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
+
+        if IS_WATER_ON and res != False:
+            tft.rect(10, 180, 113, 10, st7789.WHITE)
+            tft.fill_rect(11, 181, 113 - int((((WATER_OFF_TIME - time.time()) / WATER_ON_TIME) * 102) + 11), 8,
+                          st7789.BLACK)
+        elif IS_WATER_ON and res == False:
+            IS_WATER_ON = False
+            WATER_OFF_TIME = 0
+            save_file('0')
 
 
 def ___wake():
@@ -311,26 +340,30 @@ def ___wake():
     global MAX_TRY
     global MAX_SLEEP
 
-    show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
-    print('Turning on Water ... ')
-    __print('Turning', 'on', 'Water', st7789.BLUE, st7789.WHITE)
+    if __wifi__():
+        wdt.feed()
 
-    try_number = 0
-    res = None
-    while res is None and try_number < MAX_TRY:
-        res = miio.set_power(True)
-        try_number += 1
-        time.sleep(MAX_SLEEP)
+        show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
+        print('Turning on Water ... ')
+        __print('Turning', 'on', 'Water', st7789.BLUE, st7789.WHITE)
 
-    if res:
-        __print('Water', 'is', 'On', st7789.GREEN, st7789.BLACK)
-    else:
-        __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
-        return
+        try_number = 0
+        res = None
+        while res is None and try_number < MAX_TRY:
+            res = miio.set_power(True)
+            try_number += 1
+            wdt.feed()
+            time.sleep(MAX_SLEEP)
 
-    IS_WATER_ON = True
-    WATER_OFF_TIME = time.time() + WATER_ON_TIME
-    save_file(str(WATER_OFF_TIME))
+        if res:
+            __print('Water', 'is', 'On', st7789.GREEN, st7789.BLACK)
+        else:
+            __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
+            return
+
+        IS_WATER_ON = True
+        WATER_OFF_TIME = time.time() + WATER_ON_TIME
+        save_file(str(WATER_OFF_TIME))
 
 
 def wake___():
@@ -339,26 +372,30 @@ def wake___():
     global MAX_SLEEP
     global MAX_TRY
 
-    show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
-    print('Turning off Water ... ')
-    __print('Turning', 'off', 'Water', st7789.BLUE, st7789.WHITE)
+    if __wifi__():
+        wdt.feed()
 
-    try_number = 0
-    res = None
-    while res is None and try_number < MAX_TRY:
-        res = miio.set_power()
-        try_number += 1
-        time.sleep(MAX_SLEEP)
+        show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
+        print('Turning off Water ... ')
+        __print('Turning', 'off', 'Water', st7789.BLUE, st7789.WHITE)
 
-    if res:
-        __print('Water', 'is', 'Off', st7789.RED, st7789.WHITE)
-    else:
-        __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
-        return
+        try_number = 0
+        res = None
+        while res is None and try_number < MAX_TRY:
+            res = miio.set_power()
+            try_number += 1
+            wdt.feed()
+            time.sleep(MAX_SLEEP)
 
-    WATER_OFF_TIME = 0
-    IS_WATER_ON = False
-    save_file('0')
+        if res:
+            __print('Water', 'is', 'Off', st7789.RED, st7789.WHITE)
+        else:
+            __print('Try', 'Again', 'Err', st7789.MAGENTA, st7789.WHITE)
+            return
+
+        WATER_OFF_TIME = 0
+        IS_WATER_ON = False
+        save_file('0')
 
 
 async def __wake__(btn, press_type):
@@ -372,14 +409,14 @@ async def __wake__(btn, press_type):
     START_TIME = float('inf')
     tft.on()
 
-    if not wifi.is_connected() and btn != BUTTON_RIGHT and press_type != SINGLE_PRESS:
-        connect_wifi()
+    wdt.init()
+    wdt.feed()
 
     if press_type == SINGLE_PRESS:
         if btn == BUTTON_LEFT:
-            _wake()
+            await _wake()
         elif btn == BUTTON_RIGHT:
-            wake_()
+            await wake_()
     elif press_type == DOUBLE_PRESS:
         __wake()
     elif press_type == LONG_PRESS:
@@ -388,6 +425,7 @@ async def __wake__(btn, press_type):
         elif btn == BUTTON_RIGHT:
             wake___()
 
+    wdt.feed()
     gc.collect()
     START_TIME = time.time()
 
@@ -428,15 +466,19 @@ async def main():
     tft.init()
     tft.fill(st7789.BLACK)
     gc.collect()
-    wake_()
 
-    wdt = watchdog.WDT(0, 20)  # 20 sec
+    wdt.init()
+    await wake_()
+    wdt.feed()
+
     START_TIME = time.time()
     while True:
         update_battery_and_wifi()
 
         if time.time() - START_TIME > TIME_OUT:
             print('Going to sleep ... ')
+
+            wdt.deinit()
             tft.off()
 
             if not IS_WATER_ON:
@@ -454,7 +496,6 @@ async def main():
             START_TIME = time.time()
 
         await asyncio.sleep_ms(1000)
-        wdt.feed()
 
 
 if __name__ == '__main__':

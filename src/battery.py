@@ -6,7 +6,7 @@ __ADC__ = ADC(ADC_PIN, atten=ADC.ATTN_11DB)
 CVF = 1.783
 
 
-def get_volt(loop=20):
+def get_volt(loop=50):
     global __ADC__
     global CVF
 
@@ -32,4 +32,4 @@ def get_charge_level(x):
     else:
         y = -233.99 * x2 + 2022.2 * x - 4267.3
 
-    return int(round(y))
+    return int(y)
