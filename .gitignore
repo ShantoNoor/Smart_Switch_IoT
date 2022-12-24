@@ -4,4 +4,4 @@
 src/lib/CONFIG.py
 src/lib/miio_data.py
 src/CONFIG.py
-src/miio_data.pyg
+src/miio_data.py
