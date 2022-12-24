@@ -19,7 +19,7 @@ from weather import *
 TIME_OUT = 10
 START_TIME = 0
 
-DEEPSLEEP_TIME = 20 * 60  # sec
+DEEPSLEEP_TIME = 15 * 60  # sec
 
 WATER_ON_TIME = 11 * 60  # sec
 IS_WATER_ON = False
@@ -128,6 +128,7 @@ def __wifi__():
             return False
 
     wdt.feed()
+    time.sleep(1)
     return True
 
 
@@ -196,8 +197,9 @@ def update_battery_and_wifi():
 
         bl_str = str(f'{bl}%')
 
+    # for removing previous battery level
+    tft.text(fontb16, '    ', tft.width() - len(bl_str) * fontb16.WIDTH - 34, 8, st7789.WHITE, st7789.BLACK)
     tft.text(fontb16, bl_str, tft.width() - len(bl_str) * fontb16.WIDTH - 34, 8, st7789.WHITE, st7789.BLACK)
-    # middle(f'{volt}', 0, st7789.BLACK, font16, st7789.GREEN)
     tft.bitmap(wifi_icon, 0, 0, WIFI_ICON_INDEX)
     tft.bitmap(battery_icon, 103, 0, BATTERY_ICON_INDEX)
 
