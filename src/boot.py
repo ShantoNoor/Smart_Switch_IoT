@@ -1,6 +1,6 @@
 import gc
 
-from machine import Pin, reset
+from machine import Pin
 
 import rtime
 import tft_config
