@@ -11,6 +11,7 @@ gc.enable()
 tft = tft_config.config(0)
 wifi = WiFi.Wifi()
 real_time = rtime.RTime()
+ADC_EN = Pin(14, Pin.OUT)
 
 
 def connect_wifi():
@@ -35,5 +36,4 @@ if __name__ == '__main__':
 
     # Enable ADC for getting battery voltage
     gc.collect()
-    ADC_EN = Pin(14, Pin.OUT)
     ADC_EN.value(1)

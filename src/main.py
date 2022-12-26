@@ -19,7 +19,7 @@ from weather import *
 TIME_OUT = 10
 START_TIME = 0
 
-DEEPSLEEP_TIME = 10 * 60  # sec
+DEEPSLEEP_START_TIME = 10 * 60  # sec
 
 WATER_ON_TIME = 11 * 60  # sec
 IS_WATER_ON = False
@@ -438,7 +438,7 @@ async def main():
     global WATER_ON_TIME
     global TIME_OUT
     global START_TIME
-    global DEEPSLEEP_TIME
+    global DEEPSLEEP_START_TIME
     global BUTTON_LEFT
     global BUTTON_RIGHT
     global SINGLE_PRESS
@@ -485,13 +485,15 @@ async def main():
 
             if not IS_WATER_ON:
                 st = time.time()
-                lightsleep((DEEPSLEEP_TIME * 1000))
-                if time.time() - st >= DEEPSLEEP_TIME:
+                lightsleep(int(DEEPSLEEP_START_TIME * 1000))
+                if time.time() - st >= DEEPSLEEP_START_TIME:
                     print('Going to deep sleep ... ')
-                    deepsleep()
+                    ADC_EN.value(0)
+                    tft.sleep_mode(True)
+                    deepsleep(1 << 30)
             else:
                 st = int(WATER_OFF_TIME - time.time()) * 1000
-                lightsleep(st)
+                lightsleep(int(st))
                 if WATER_OFF_TIME - time.time() <= 0:
                     __alarm__()
 
