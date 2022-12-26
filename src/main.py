@@ -1,14 +1,15 @@
 import esp32
 import st7789
-import vga1_bold_16x16 as fontb16
-import vga1_bold_16x32 as fontb32
 import vga2_8x16 as font16
+import vga2_bold_16x16 as fontb16
+import vga2_bold_16x32 as fontb32
 from machine import *
 
 import battery_icon
 import miio
 import watchdog
 import wifi_icon
+from CONFIG import SSID
 from battery import *
 from boot import *
 from pushbutton import *
@@ -120,11 +121,11 @@ def read_file():
 def __wifi__():
     wdt.feed()
     if not wifi.is_connected():
-        __print('Conn-ing', 'with', 'FreeNet', st7789.BLACK)
+        __print('Conn-ing', 'with', SSID, st7789.BLACK)
         connect_wifi()
         wdt.feed()
         if not wifi.is_connected():
-            __print('Unable', 'Con-with', 'FreeNet', st7789.BLACK)
+            __print('Unable', 'Con-with', SSID, st7789.BLACK)
             return False
 
     wdt.feed()
@@ -305,6 +306,7 @@ def __wake():
         wdt.feed()
 
         show_info(st7789.BLUE, 'ON', 'OFF', fontb16)
+        print('Getting Water on/off status ... ')
         __print('Getting', 'Water', 'Status', st7789.BLUE)
 
         try_number = 0
@@ -409,7 +411,10 @@ async def __wake__(btn, press_type):
     global LONG_PRESS
 
     START_TIME = float('inf')
+
     tft.on()
+    show_info(st7789.BLACK, 'ON', 'OFF', fontb16)
+    __print('Loading', 'Please', 'Wait', st7789.BLACK)
 
     wdt.init()
     wdt.feed()
@@ -481,6 +486,8 @@ async def main():
             print('Going to sleep ... ')
 
             wdt.deinit()
+
+            tft.fill(st7789.BLACK)
             tft.off()
 
             if not IS_WATER_ON:
