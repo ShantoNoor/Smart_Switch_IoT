@@ -19,7 +19,7 @@ from weather import *
 TIME_OUT = 10
 START_TIME = 0
 
-DEEPSLEEP_TIME = 15 * 60  # sec
+DEEPSLEEP_TIME = 10 * 60  # sec
 
 WATER_ON_TIME = 11 * 60  # sec
 IS_WATER_ON = False
