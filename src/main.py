@@ -9,7 +9,6 @@ import battery_icon
 import miio
 import watchdog
 import wifi_icon
-from CONFIG import SSID
 from battery import *
 from boot import *
 from pushbutton import *
@@ -22,7 +21,7 @@ START_TIME = 0
 
 DEEPSLEEP_START_TIME = 10 * 60  # sec
 
-WATER_ON_TIME = 11 * 60  # sec
+WATER_ON_TIME = 22 * 60  # sec
 IS_WATER_ON = False
 WATER_OFF_TIME = 0
 
