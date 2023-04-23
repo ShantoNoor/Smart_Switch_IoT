@@ -80,7 +80,7 @@ def md5(message):
     return sum(x << (32 * i) for i, x in enumerate(hash_pieces))
 
 
-def digest(message):
+def digest(message):  # bytes -> hex
     digest = md5(message)
     raw = digest.to_bytes(16, 'little')
     return '{:032x}'.format(int.from_bytes(raw, 'big'))

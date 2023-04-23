@@ -1,6 +1,7 @@
 import gc
 import socket
 
+import aes
 import miio_data
 from CONFIG import *
 from packet_creator import *
@@ -42,7 +43,7 @@ def get_status():
         return None
 
     gc.collect()
-    packet = create_packet(data, miio_data.GET_POWER_STATUS_DATA, DEVICE_TOKEN)
+    packet = create_packet(data, aes.encrypt(miio_data.GET_POWER_STATUS_DATA), DEVICE_TOKEN)
 
     gc.collect()
 
@@ -59,6 +60,7 @@ def get_status():
 
     if data != b'':
         data = byte_to_hex(data)[64:]
+        data = aes.decrypt(data)
         if data == miio_data.POWER_ON_RES:
             return True
         elif data == miio_data.POWER_OFF_RES:
@@ -79,7 +81,7 @@ def set_power(value=False):
         PACKET_DATA = miio_data.POWER_ON_DATA
 
     gc.collect()
-    packet = create_packet(data, PACKET_DATA, DEVICE_TOKEN)
+    packet = create_packet(data, aes.encrypt(PACKET_DATA), DEVICE_TOKEN)
 
     gc.collect()
 
@@ -96,6 +98,7 @@ def set_power(value=False):
 
     if data != b'':
         data = byte_to_hex(data)[64:]
+        data = aes.decrypt(data)
         if data == miio_data.OK_RES:
             return True
 

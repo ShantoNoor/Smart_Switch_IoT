@@ -9,8 +9,8 @@ import battery_icon
 import miio
 import watchdog
 import wifi_icon
-from battery import *
 from boot import *
+from battery import *
 from pushbutton import *
 from rtime import *
 from tft_buttons import *
