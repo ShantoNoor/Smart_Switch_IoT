@@ -31,7 +31,7 @@ This project supports only the `Xiaomi Chuangmi M1 Wifi plug`.
 ## Protocol Documentation
 This project is based on the documentation provided by OpenMiHome. See https://github.com/OpenMiHome/mihome-binary-protocol,  for details.
 
-## Frimware Used
+## Firmware Used
 https://github.com/ShantoNoor/st7789_mpy/tree/master/firmware/T-DISPLAY-ESP32
 
 ## 3D Case from Thingiverse
