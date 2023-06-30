@@ -250,6 +250,8 @@ async def wake_():
         minuie = rt[RTime.MINUTE]
         am_pm = rt[RTime.AM_PM]
 
+        if hour == 0:
+            hour = f'12'
         if hour < 10:
             hour = f'0{hour}'
 
