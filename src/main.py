@@ -247,18 +247,18 @@ async def wake_():
 
         rt = real_time.get_time()
         hour = rt[RTime.HOUR]
-        minuie = rt[RTime.MINUTE]
+        minute = rt[RTime.MINUTE]
         am_pm = rt[RTime.AM_PM]
 
         if hour == 0:
             hour = f'12'
-        if hour < 10:
+        elif hour < 10:
             hour = f'0{hour}'
 
-        if minuie < 10:
-            minuie = f'0{minuie}'
+        if minute < 10:
+            minute = f'0{minute}'
 
-        middle(f'{hour}:{minuie}{am_pm}', 40, bg=st7789.RED)
+        middle(f'{hour}:{minute}{am_pm}', 40, bg=st7789.RED)
         middle(f' {rt[RTime.DATE]}/{rt[RTime.MONTH]} ', 90, bg=st7789.BLUE)
         middle(f' {rt[RTime.YEAR]} ', 122, bg=st7789.BLUE)
         middle(f' {rt[RTime.DAY]} ', 166, bg=0x2104)
