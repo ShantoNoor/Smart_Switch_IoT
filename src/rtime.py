@@ -53,11 +53,10 @@ class RTime:
         second = real_time[6]
         am_pm = 'am'
 
-        if hour > 12:
-            hour -= 12
-
         if hour > 11:
             am_pm = 'pm'
+            if hour > 12:
+                hour -= 12
 
         if day == 0:
             day = 'Mon'
